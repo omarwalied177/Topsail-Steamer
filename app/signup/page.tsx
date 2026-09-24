@@ -1,0 +1,10 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+export default function SignupPage(){
+ const router=useRouter(); const [name,setName]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [error,setError]=useState<string|null>(null); const [loading,setLoading]=useState(false); const [showPassword,setShowPassword]=useState(false);
+ async function submit(e:React.FormEvent){e.preventDefault();setError(null);setLoading(true);const res=await fetch("/api/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,password})});const data=await res.json();setLoading(false);if(!res.ok){setError(data.error||"Could not create account.");return;}router.push(`/login?email=${encodeURIComponent(email)}`)}
+ return <div className="login-page"><div className="login-card"><img src="/topsail-logo.jpeg" alt="Topsail Steamer" className="login-logo"/><p className="login-eyebrow">Operations Dashboard</p><h1 className="font-display login-title">Create Account</h1><p className="login-copy">Create staff access to the Topsail Steamer dashboard.</p><form onSubmit={submit} className="login-form"><label>Name<input required value={name} onChange={e=>setName(e.target.value)}/></label><label>Email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<div className="password-wrap"><input required minLength={8} type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)}/><button type="button" className="password-icon" onClick={()=>setShowPassword(!showPassword)} aria-label={showPassword?"Hide password":"Show password"}>◉</button></div></label>{error&&<p className="login-error">{error}</p>}<button disabled={loading} className="login-submit">{loading?"Creating…":"Create Account"}</button><p className="login-signup">Already have an account? <Link href="/login">Sign in</Link></p></form></div></div>
+}
