@@ -1,4 +1,5 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -11,5 +12,27 @@ const LINKS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  return <aside className="sidebar"><nav>{LINKS.map((link) => { const active = pathname?.startsWith(link.href); return <Link key={link.href} href={link.href} className={`nav-link ${active ? "active" : ""}`}><span className="nav-icon">{link.icon}</span><span>{link.label}</span>{link.soon && <span className="soon-badge">Soon</span>}</Link>; })}</nav><div className="sidebar-wave" aria-hidden="true"/></aside>;
+
+  return (
+    <aside className="sidebar">
+      <nav>
+        {LINKS.map((link) => {
+          const active = pathname?.startsWith(link.href);
+
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`nav-link ${active ? "active" : ""}`}
+            >
+              <span className="nav-icon">{link.icon}</span>
+              <span>{link.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="sidebar-wave" aria-hidden="true" />
+    </aside>
+  );
 }
