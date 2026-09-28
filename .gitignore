@@ -2,3 +2,7 @@
 .env.local
 .env.local.backup
 .env*.local
+
+.next/
+node_modules/
+*.tsbuildinfo

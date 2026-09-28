@@ -59,7 +59,6 @@ export function DiscountCodeCard() {
           <button className="icon-button" aria-label="Edit discount code" onClick={() => { setEditing(true); setDraft(code); }}><Icon name="edit" size={18} /></button>
         </div>
       </label>
-      <div className="info-note"><Icon name="info" size={18} /> <span>This code is shared across customer email templates and can be updated by signed-in staff.</span></div>
       {editing && <div className="code-actions">
         <button className="button button-light" onClick={() => { setEditing(false); setDraft(code); }}>Cancel</button>
         <button className="button button-orange" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save Code"}</button>

@@ -15,14 +15,20 @@ export default async function DashboardHome() {
   const reviewQueue = invoices.filter((r) => r.match_status === "no_match" || r.match_status === "needs_review").length;
 
   const welcomeSent = leads.filter(l => l.welcome_sent).length;
-  const remindersSent = leads.filter(l => l.reminder_sent).length;
-  const pendingReminders = leads.filter(l => !l.reminder_sent).length;
+  const remindersSent = leads.filter(l => l.remainder_sent === true).length;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const pendingReminders = leads.filter((lead) => {
+    const arrival = typeof lead.date_arrival === "string" ? lead.date_arrival.slice(0, 10) : "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(arrival) && arrival <= tomorrowKey && lead.remainder_sent !== true;
+  }).length;
 
   const cards = [
     ["Total Leads", leads.length],
     ["Welcome Sent", welcomeSent],
     ["Reminders Sent", remindersSent],
-    ["Pending Reminders", pendingReminders],
+    ["Reminder Queue", pendingReminders],
   ];
 
   return <div>

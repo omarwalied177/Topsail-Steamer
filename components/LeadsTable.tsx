@@ -15,7 +15,7 @@ type Lead = {
   date_arrival: string | null;
   date_received: string | null;
   welcome_sent: boolean | null;
-  reminder_sent: boolean | null;
+  remainder_sent: boolean | null;
 };
 
 type EmailType = "welcome" | "reminder";
@@ -90,7 +90,7 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
   }, [emailType]);
 
   function exportCsv() {
-    const headers = ["id", "first_name", "last_name", "email", "phone", "discount_code", "city", "state", "zip_code", "date_arrival", "date_received", "welcome_sent", "reminder_sent"];
+    const headers = ["id", "first_name", "last_name", "email", "phone", "discount_code", "city", "state", "zip_code", "date_arrival", "date_received", "welcome_sent", "remainder_sent"];
     const lines = [headers.map(csvCell).join(",")];
     for (const lead of filtered) lines.push(headers.map((key) => csvCell(lead[key as keyof Lead])).join(","));
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -126,7 +126,7 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
   return <div className="leads-workspace">
     <section className="lead-operations card">
       <div className="toolbar-card">
-        <div><p className="eyebrow">Lead operations</p><h3 className="font-display text-xl" style={{ color: "var(--navy)" }}>Visitor referrals</h3><p className="text-xs mt-1" style={{ color: "var(--navy-light)" }}>{filtered.length} of {rows.length} leads</p></div>
+        <div><p className="eyebrow">Lead operations</p><h3 className="font-display text-xl" style={{ color: "var(--navy)" }}>Visitor referrals</h3></div>
         <div className="toolbar-actions"><div className="search-wrap"><Icon name="search"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search leads…" className="search-input"/></div><button onClick={exportCsv} className="primary-button"><Icon name="download"/>Export CSV</button></div>
       </div>
       <div className="table-shell">
@@ -139,14 +139,13 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
             <td title={[lead.city, lead.state, lead.zip_code].filter(Boolean).join(", ")}><div className="cell-truncate">{[lead.city, lead.state, lead.zip_code].filter(Boolean).join(", ") || "—"}</div></td>
             <td className="nowrap">{formatDate(lead.date_arrival)}</td>
             <td><span className="discount-pill">{lead.discount_code || "—"}</span></td>
-            <td><BoolBadge value={lead.welcome_sent}/></td><td><BoolBadge value={lead.reminder_sent}/></td>
+            <td><BoolBadge value={lead.welcome_sent}/></td><td><BoolBadge value={lead.remainder_sent}/></td>
           </tr>)}{filtered.length === 0 && <tr><td colSpan={7} className="empty-cell">No matching leads.</td></tr>}</tbody>
         </table>
       </div>
-      <div className="table-footer"><span>Showing {filtered.length} of {rows.length}</span><span className="page-current">1</span></div>
     </section>
 
-    <aside className="right-rail">
+    <div className="lead-editors-grid">
       <section className="side-card card">
         <div className="card-title-row"><span className="icon-tile blue"><Icon name="mail"/></span><h3 className="font-display text-2xl" style={{ color: "var(--navy)" }}>Email Templates</h3></div>
         <div className="template-tabs"><button className={emailType === "welcome" ? "active" : ""} onClick={() => { setEmailType("welcome"); setPreview(false); }}>Welcome Email</button><button className={emailType === "reminder" ? "active" : ""} onClick={() => { setEmailType("reminder"); setPreview(false); }}>Reminder Email</button></div>
@@ -161,10 +160,9 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
       <section className="side-card card discount-card">
         <div className="card-title-row"><span className="icon-tile orange"><Icon name="tag"/></span><h3 className="font-display text-2xl" style={{ color: "var(--navy)" }}>Discount Code</h3></div>
         <label className="field-label">Current Code<div className="code-row"><input value={discountCode} onChange={(e) => setDiscountCode(e.target.value.toUpperCase())} className="editor-input" placeholder="Enter code"/><span className="code-edit" aria-hidden="true">✎</span></div></label>
-        <div className="info-note">This code is shared across customer email templates and can be updated by signed-in staff.</div>
         {codeMessage && <p className={`save-message ${codeMessage.includes("success") ? "" : "save-error"}`}>{codeMessage}</p>}
         <button className="primary-button full-button" onClick={saveDiscountCode} disabled={savingCode || !discountCode.trim()}><Icon name="save"/>{savingCode ? "Saving…" : "Save Code"}</button>
       </section>
-    </aside>
+    </div>
   </div>;
 }

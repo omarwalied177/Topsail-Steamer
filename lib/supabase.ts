@@ -43,7 +43,7 @@ export type Lead = {
   date_arrival: string | null;
   date_received: string | null;
   welcome_sent: boolean;
-  reminder_sent: boolean | null;
+  remainder_sent: boolean | null;
   welcome_email_subject?: string | null;
   welcome_email_body?: string | null;
   reminder_email_subject?: string | null;

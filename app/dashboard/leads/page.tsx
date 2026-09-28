@@ -10,8 +10,17 @@ export default async function LeadsPage() {
   try { leads = await getLeads(); } catch (e) { error = e instanceof Error ? e.message : "Could not load leads."; }
 
   const welcomeSent = leads.filter((l) => l.welcome_sent === true).length;
-  const reminderSent = leads.filter((l) => l.reminder_sent === true).length;
-  const pending = leads.filter((l) => l.reminder_sent !== true).length;
+  // Supabase column is intentionally named `remainder_sent` (not reminder_sent).
+  const reminderSent = leads.filter((l) => l.remainder_sent === true).length;
+  // Queue = unsent leads arriving today, tomorrow, or already overdue.
+  // Leads without a valid arrival date and future arrivals are not actionable yet.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const pending = leads.filter((lead) => {
+    const arrival = typeof lead.date_arrival === "string" ? lead.date_arrival.slice(0, 10) : "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(arrival) && arrival <= tomorrowKey && lead.remainder_sent !== true;
+  }).length;
 
   return (
     <div>

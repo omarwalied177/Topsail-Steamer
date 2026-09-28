@@ -48,7 +48,7 @@ Run `supabase-dashboard-migration.sql` in the Supabase SQL Editor. This adds fie
 - `reminder_email_subject`
 - `reminder_email_body`
 
-The dashboard keeps `welcome_sent` and `reminder_sent` as explicit booleans and displays `True` / `False` instead of blank values.
+The dashboard keeps `welcome_sent` and `remainder_sent` as explicit booleans and displays `True` / `False` instead of blank values.
 
 The Chamber Leads page includes CSV export, search, status cards, and a Welcome/Reminder email editor. The editor stores the email content in Supabase. To make n8n send the edited content, have the Gmail nodes read the corresponding Supabase fields before sending and write the exact sent subject/body back to the lead.
 
