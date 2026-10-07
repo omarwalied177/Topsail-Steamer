@@ -17,11 +17,8 @@ export default async function ReviewsPage() {
   return <div>
     <div className="page-heading review-heading">
       <div>
-        <p className="eyebrow">Customer Experience</p>
         <h2 className="font-display text-3xl" style={{ color: "var(--navy)" }}>Review Replies</h2>
-        <p className="page-subtitle">Review drafted Google replies and BentoBox diner-feedback emails, approve Google replies for automatic posting, and mark BentoBox replies ready to paste.</p>
       </div>
-      <div className="automation-live-pill"><span className="status-dot" /> Review workflow live</div>
     </div>
     {error ? <SetupNeeded message={error} /> : <ReviewOperations initialReviews={reviews} initialContext={context} />}
   </div>;

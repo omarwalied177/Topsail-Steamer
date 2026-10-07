@@ -1,60 +1,69 @@
-import { getLeads, getCalendarEntries, getInvoiceLog, getReviewReplies } from "@/lib/supabase";
 import Link from "next/link";
+import { getLeads, getInvoiceLog, getReviewReplies, supabaseFetch } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardHome() {
-  let leads: Awaited<ReturnType<typeof getLeads>> = [];
-  let calendar: Awaited<ReturnType<typeof getCalendarEntries>> = [];
-  let invoices: Awaited<ReturnType<typeof getInvoiceLog>> = [];
-  let reviews: Awaited<ReturnType<typeof getReviewReplies>> = [];
-  try { leads = await getLeads(); } catch {}
-  try { calendar = await getCalendarEntries(); } catch {}
-  try { invoices = await getInvoiceLog(); } catch {}
-  try { reviews = await getReviewReplies(); } catch {}
-  const reviewQueue = invoices.filter((r) => r.match_status === "no_match" || r.match_status === "needs_review").length;
+type PayrollRow = {
+  month?: string;
+  revenue?: number | string;
+  controllable_labor_cost?: number | string;
+  labor_cost_pct?: number | string;
+};
 
-  const welcomeSent = leads.filter(l => l.welcome_sent).length;
-  const remindersSent = leads.filter(l => l.remainder_sent === true).length;
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-  const pendingReminders = leads.filter((lead) => {
-    const arrival = typeof lead.date_arrival === "string" ? lead.date_arrival.slice(0, 10) : "";
-    return /^\d{4}-\d{2}-\d{2}$/.test(arrival) && arrival <= tomorrowKey && lead.remainder_sent !== true;
-  }).length;
+const money = (value: unknown) =>
+  Number.isFinite(Number(value))
+    ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value))
+    : "—";
+
+const pct = (value: unknown) =>
+  Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : "—";
+
+export default async function DashboardHome() {
+  const [leadsResult, invoicesResult, reviewsResult, payrollResult] = await Promise.allSettled([
+    getLeads(), getInvoiceLog(), getReviewReplies(),
+    supabaseFetch<PayrollRow[]>("payroll_monthly?select=month,revenue,controllable_labor_cost,labor_cost_pct&order=month.desc&limit=12")
+  ]);
+
+  const leads = leadsResult.status === "fulfilled" ? leadsResult.value : [];
+  const invoices = invoicesResult.status === "fulfilled" ? invoicesResult.value : [];
+  const reviews = reviewsResult.status === "fulfilled" ? reviewsResult.value : [];
+  const payroll = payrollResult.status === "fulfilled" ? payrollResult.value : [];
+  const latestPayroll = payroll[0];
+  const reviewQueue = invoices.filter(x => x.match_status === "needs_review" || x.match_status === "no_match").length;
+  const pendingReplies = reviews.filter(x => ["draft", "pending", "needs_approval", "awaiting_approval"].includes(String(x.status || "").toLowerCase())).length;
+  const dataErrors = [leadsResult, invoicesResult, reviewsResult, payrollResult].filter(x => x.status === "rejected").length;
 
   const cards = [
-    ["Total Leads", leads.length],
-    ["Welcome Sent", welcomeSent],
-    ["Reminders Sent", remindersSent],
-    ["Reminder Queue", pendingReminders],
+    { href: "/dashboard/leads", n: "01", title: "Chamber Leads", metric: String(leads.length), label: "Visitor referrals", detail: `${leads.filter(x => !x.welcome_sent).length} welcome emails pending`, icon: "✉" },
+    { href: "/dashboard/invoices", n: "02", title: "Vendor Invoices", metric: String(invoices.length), label: "Invoice lines logged", detail: `${reviewQueue} lines need review`, icon: "$" },
+    { href: "/dashboard/inventory", n: "03", title: "Inventory & Food Cost", metric: "Open", label: "Inventory workspace", detail: "View counts and monthly close", icon: "◫" },
+    { href: "/dashboard/labor", n: "04", title: "Labor Cost & Growth", metric: latestPayroll ? pct(latestPayroll.labor_cost_pct) : "—", label: "Latest labor cost", detail: latestPayroll?.month ? `Period ${latestPayroll.month}` : "No payroll close found", icon: "◒" },
+    { href: "/dashboard/reviews", n: "05", title: "Review Replies", metric: String(reviews.length), label: "Review records", detail: `${pendingReplies} awaiting action`, icon: "★" },
+    { href: "/dashboard/compliance", n: "06", title: "Royalty & Delivery", metric: "Open", label: "Compliance workspace", detail: "Weekly royalty + monthly credits", icon: "▣" },
   ];
 
-  return <div>
-    <div className="mb-7"><p className="text-[11px] uppercase tracking-wide" style={{ color: "var(--seafoam)", letterSpacing: "0.1em" }}>Operations Dashboard</p><h2 className="font-display text-3xl" style={{ color: "var(--navy)" }}>Overview</h2><p className="text-sm mt-1" style={{ color: "var(--navy-light)" }}>Live operational view powered by Supabase.</p></div>
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">{cards.map(([label,value]) => <div key={String(label)} className="rounded-lg p-5" style={{ background: "white", border: "1px solid #d9d0bd" }}><div className="text-xs uppercase tracking-wide" style={{ color: "var(--seafoam)" }}>{label}</div><div className="font-display text-3xl mt-2" style={{ color: "var(--navy)" }}>{value}</div></div>)}</div>
-    <div className="grid lg:grid-cols-2 gap-4 mb-4">
-      <Link href="/dashboard/leads" className="rounded-lg p-6" style={{ background: "white", border: "1px solid #d9d0bd" }}><div className="text-xs uppercase" style={{ color: "var(--mustard-dark)" }}>Chamber</div><h3 className="font-display text-xl mt-1" style={{ color: "var(--navy)" }}>Leads</h3><p className="text-sm mt-2" style={{ color: "var(--navy-light)" }}>View visitor referrals, arrival dates, welcome status, and reminder status.</p></Link>
-      <Link href="/dashboard/calendar" className="rounded-lg p-6" style={{ background: "white", border: "1px solid #d9d0bd" }}><div className="text-xs uppercase" style={{ color: "var(--mustard-dark)" }}>Content</div><h3 className="font-display text-xl mt-1" style={{ color: "var(--navy)" }}>Content Calendar</h3><p className="text-sm mt-2" style={{ color: "var(--navy-light)" }}>{calendar.length} calendar entries currently in Supabase.</p></Link>
+  return <div className="overview-page">
+    <div className="overview-header">
+      <div><p className="overview-eyebrow">TOPSAIL STEAMER · ANNA MARIA ISLAND</p><h1>Business Dashboard</h1><p className="overview-sub">Operations overview</p></div>
+      <div className="overview-date"><span className="live-dot"/>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
     </div>
-    <Link href="/dashboard/labor" className="card" style={{ display: "block", padding: "20px 22px", textDecoration: "none", marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div><div className="text-xs uppercase" style={{ color: "var(--orange)", fontWeight: 800 }}>People / Ops</div><h3 className="font-display text-xl mt-1" style={{ color: "var(--navy)" }}>Labor Cost & Growth Planning</h3><p className="text-sm mt-2" style={{ color: "var(--navy-light)" }}>Upload Homebase payroll, track controllable labor cost against 13%, and review growth-hour budgets.</p></div>
-        <span className="invoice-status matched">Open</span>
-      </div>
-    </Link>
-    <Link href="/dashboard/reviews" className="card" style={{ display: "block", padding: "20px 22px", textDecoration: "none", marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div><div className="text-xs uppercase" style={{ color: "var(--blue)", fontWeight: 800 }}>Customer Experience</div><h3 className="font-display text-xl mt-1" style={{ color: "var(--navy)" }}>Google & BentoBox Review Replies</h3><p className="text-sm mt-2" style={{ color: "var(--navy-light)" }}>Google reviews plus BentoBox feedback emails flow into one approval queue. Review queue: {reviews.filter(r => r.status === "pending" || r.status === "manual_paste_ready" || r.status === "approved").length}. Posted: {reviews.filter(r => r.status === "posted").length}.</p></div>
-        <span className={`invoice-status ${reviews.filter(r => r.status === "pending" || r.status === "manual_paste_ready").length ? "needs_review" : "matched"}`}>{reviews.filter(r => r.status === "pending" || r.status === "manual_paste_ready").length ? "Needs attention" : "Queue clear"}</span>
-      </div>
-    </Link>
-    <Link href="/dashboard/invoices" className="card" style={{ display: "block", padding: "20px 22px", textDecoration: "none" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-        <div><div className="text-xs uppercase" style={{ color: "var(--orange)", fontWeight: 800 }}>People / Ops</div><h3 className="font-display text-xl mt-1" style={{ color: "var(--navy)" }}>Vendor Invoice Filing & Log</h3><p className="text-sm mt-2" style={{ color: "var(--navy-light)" }}>Invoice lines logged: {invoices.length}. Review queue: {reviewQueue}.</p></div>
-        <span className={`invoice-status ${reviewQueue ? "needs_review" : "matched"}`}>{reviewQueue ? `${reviewQueue} to review` : "Queue clear"}</span>
-      </div>
-    </Link>
+
+    {dataErrors > 0 && <div className="overview-notice">Some live data could not be loaded. Open the related section to check its connection.</div>}
+
+    <section className="overview-kpis">
+      <div className="overview-kpi"><span>NET SALES</span><strong>{latestPayroll ? money(latestPayroll.revenue) : "—"}</strong><small>{latestPayroll?.month ? `Latest payroll close · ${latestPayroll.month}` : "No monthly close available"}</small></div>
+      <div className="overview-kpi"><span>LABOR COST</span><strong>{latestPayroll ? pct(latestPayroll.labor_cost_pct) : "—"}</strong><small>{latestPayroll ? money(latestPayroll.controllable_labor_cost) + " controllable cost" : "No monthly close available"}</small></div>
+      <div className="overview-kpi"><span>INVOICE REVIEW</span><strong>{reviewQueue}</strong><small>Lines requiring review</small></div>
+      <div className="overview-kpi"><span>LEADS</span><strong>{leads.length}</strong><small>Records in lead tracker</small></div>
+    </section>
+
+    <div className="overview-section-title"><h2>Operations</h2><span>Choose a workspace</span></div>
+    <section className="overview-cards">
+      {cards.map(card => <Link href={card.href} className="overview-card" key={card.href}>
+        <div className="overview-card-top"><span className="overview-card-icon">{card.icon}</span><span className="overview-card-number">{card.n}</span></div>
+        <h3>{card.title}</h3><strong className="overview-card-metric">{card.metric}</strong><span className="overview-card-label">{card.label}</span>
+        <div className="overview-card-bottom"><span>{card.detail}</span><b>Open <span aria-hidden>→</span></b></div>
+      </Link>)}
+    </section>
   </div>;
 }

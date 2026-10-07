@@ -48,39 +48,11 @@ export type Lead = {
   welcome_email_body?: string | null;
   reminder_email_subject?: string | null;
   reminder_email_body?: string | null;
-  created_at?: string;
-};
-
-export type CalendarEntry = {
-  id: string;
-  date: string | null;
-  content_type: string | null;
-  title: string | null;
-  objective: string | null;
-  description: string | null;
-  related_event_or_occasion: string | null;
-  suggested_channel: string | null;
-  marketing_angle: string | null;
-  caption: string | null;
-  source_url: string | null;
-  brand_template_or_image: string | null;
-  approval_status: string | null;
-  approved_at: string | null;
-  graphic_url: string | null;
-  publish_status: string | null;
-  published_at: string | null;
-  created_at?: string;
 };
 
 export async function getLeads(): Promise<Lead[]> {
   return supabaseFetch<Lead[]>(
     "Leads?select=*&order=date_received.desc"
-  );
-}
-
-export async function getCalendarEntries(): Promise<CalendarEntry[]> {
-  return supabaseFetch<CalendarEntry[]>(
-    "content_calendar?select=*&order=date.asc"
   );
 }
 
@@ -95,7 +67,6 @@ export type ItemMaster = {
   category: string;
   item: string;
   count_by_unit: string;
-  conversion_rules: Record<string, unknown> | null;
   invoice_name_aliases: string[] | null;
 };
 
@@ -112,10 +83,14 @@ export type VendorInvoiceLog = {
   invoice_number: string | null;
   notes: string | null;
   month: number | null;
-  match_status: "matched" | "no_match" | "needs_review" | null;
+  match_status: "matched" | "no_match" | "needs_review" | "excluded" | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   source_type: string | null;
+  source_file_name?: string | null;
+  source_storage_path?: string | null;
+  source_url?: string | null;
+  source_message_id?: string | null;
 };
 
 export async function getInvoiceLog(): Promise<VendorInvoiceLog[]> {
@@ -126,7 +101,7 @@ export async function getInvoiceLog(): Promise<VendorInvoiceLog[]> {
 
 export async function getItemMaster(): Promise<ItemMaster[]> {
   return supabaseFetch<ItemMaster[]>(
-    "item_master?select=id,category,item,count_by_unit,conversion_rules,invoice_name_aliases&order=item.asc"
+    "item_master?select=id,category,item,count_by_unit,invoice_name_aliases&order=item.asc"
   );
 }
 
@@ -136,7 +111,7 @@ export async function getVendorMaster(): Promise<VendorMaster[]> {
   );
 }
 
-export async function createItemMaster(input: { item: string; category: string; count_by_unit: string; conversion_rules: Record<string, unknown>; invoice_name_aliases: string[] }): Promise<ItemMaster> {
+export async function createItemMaster(input: { item: string; category: string; count_by_unit: string; invoice_name_aliases: string[] }): Promise<ItemMaster> {
   const rows = await supabaseFetch<ItemMaster[]>("item_master", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(input) });
   return rows[0];
 }
@@ -146,7 +121,7 @@ export async function createVendorMaster(input: { vendor_name: string; notes: st
   return rows[0];
 }
 
-export async function updateInvoiceReview(id: string, matchStatus: "matched" | "no_match" | "needs_review", reviewedBy: string): Promise<void> {
+export async function updateInvoiceReview(id: string, matchStatus: "matched" | "no_match" | "needs_review" | "excluded", reviewedBy: string): Promise<void> {
   await supabaseFetch(`vendor_invoice_log?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
@@ -253,6 +228,7 @@ export type ReviewReply = {
   review_id: string;
   review_text: string;
   reviewer_name: string | null;
+  reviewer_email?: string | null;
   rating: number | null;
   review_posted_at: string | null;
   draft_reply: string | null;
@@ -265,6 +241,7 @@ export type ReviewReply = {
   source?: string | null;
   reviewer_email?: string | null;
   email_message_id?: string | null;
+  email_sent_at?: string | null;
   email_thread_id?: string | null;
   email_subject?: string | null;
   email_from?: string | null;
@@ -332,7 +309,7 @@ export async function createReviewReply(input: {
   return rows[0];
 }
 
-export async function updateReviewReply(id: string, patch: Partial<Pick<ReviewReply, "draft_reply" | "status" | "approved_by">>): Promise<ReviewReply> {
+export async function updateReviewReply(id: string, patch: Partial<Pick<ReviewReply, "draft_reply" | "status" | "approved_by" | "email_sent_at" | "email_message_id">>): Promise<ReviewReply> {
   const rows = await supabaseFetch<ReviewReply[]>(`review_replies?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
@@ -340,6 +317,13 @@ export async function updateReviewReply(id: string, patch: Partial<Pick<ReviewRe
   });
   if (!rows[0]) throw new Error("Review was not found.");
   return rows[0];
+}
+
+export async function deleteReviewReply(id: string): Promise<void> {
+  await supabaseFetch(`review_replies?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
 }
 
 export async function getReviewReply(id: string): Promise<ReviewReply> {

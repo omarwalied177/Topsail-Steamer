@@ -9,16 +9,21 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
     const reviewText = String(data.review_text || "").trim();
-    if (!reviewText) return NextResponse.json({ error: "Review text is required." }, { status: 400 });
+    const reviewerEmail = String(data.reviewer_email || "").trim();
+    const rating = data.rating == null || data.rating === "" ? null : Number(data.rating);
+    if (!reviewText && rating == null) return NextResponse.json({ error: "Provide either a rating or written feedback." }, { status: 400 });
+    if (rating != null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) return NextResponse.json({ error: "Rating must be between 1 and 5." }, { status: 400 });
+    if (!reviewerEmail) return NextResponse.json({ error: "Diner email is required for manual BentoBox reviews." }, { status: 400 });
     const generateDraft = Boolean(data.generateDraft);
-    const webhook = process.env.N8N_REVIEW_MANUAL_WEBHOOK_URL;
+    const webhook = process.env.N8N_REVIEW_MANUAL_WEBHOOK_URL || "https://n8n-97af.srv1958066.hstgr.cloud/webhook/topsail/review-manual";
     if (generateDraft && !webhook) return NextResponse.json({ error: "N8N_REVIEW_MANUAL_WEBHOOK_URL is not configured. Use manual reply or configure the n8n webhook first." }, { status: 503 });
     const review = await createReviewReply({
       platform: "bentobox",
       review_id: `bentobox-${crypto.randomUUID()}`,
       review_text: reviewText,
       reviewer_name: String(data.reviewer_name || "BentoBox customer").trim(),
-      rating: data.rating == null || data.rating === "" ? null : Number(data.rating),
+      reviewer_email: reviewerEmail,
+      rating,
       review_posted_at: new Date().toISOString(),
       draft_reply: null,
       status: generateDraft ? "pending" : "manual_paste_ready",

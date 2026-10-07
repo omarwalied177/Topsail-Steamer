@@ -105,11 +105,11 @@ Set `N8N_LABOR_UPLOAD_WEBHOOK_URL` in the environment. The UI sends the payroll 
 
 ## Automation 1 — Google & BentoBox Review Reply Assistant
 
-The dashboard now includes `/dashboard/reviews` for the Automation 1 workflow described in the build guide: Google reviews are collected by n8n every 4 hours, grounded with `business_context`, saved as `pending`, and held for human approval before Google posting. BentoBox stays on the manual path because the build guide documents no public BentoBox API.
+The dashboard now includes `/dashboard/reviews` for the Automation 1 workflow: Google reviews are collected by n8n, grounded with `business_context`, saved as `pending`, and held for human approval before Google posting. BentoBox feedback emails are displayed separately and can be edited, copied, or sent to the diner through a server-side n8n Gmail-send webhook.
 
 Run `automation-1-supabase.sql` in Supabase before using the review page. The page supports an approval queue, Google/BentoBox filters, editable drafts, approve/reject actions, manual BentoBox intake, and direct editing of the `business_context` rows. This mirrors the guide's UI requirements for the original review, editable draft, approval controls, and business-context maintenance.
 
-For optional AI drafting of manually entered BentoBox reviews, set `N8N_REVIEW_MANUAL_WEBHOOK_URL` to the webhook URL from the refined Automation 1 workflow. The dashboard never receives or exposes the n8n/Google/Supabase credentials in browser code.
+For optional AI drafting of manually entered BentoBox reviews, set `N8N_REVIEW_MANUAL_WEBHOOK_URL` to the webhook URL from the refined Automation 1 workflow. For the dashboard `Send email` action, set `N8N_REVIEW_MANUAL_SEND_WEBHOOK_URL` to an n8n webhook whose Gmail node sends the supplied `to`, `subject`, and `body`, then returns a 2xx response. The dashboard never receives or exposes the n8n/Gmail/Supabase credentials in browser code.
 
 
 ## Automation 3 webhook integration
@@ -151,3 +151,8 @@ https://n8n-97af.srv1958066.hstgr.cloud/webhook/topsail/automation3/ending-inven
 ```
 
 Restart/redeploy the Next.js app after changing `.env.local`.
+
+
+## Authentication troubleshooting
+
+The app uses NextAuth v4 at `/api/auth/[...nextauth]`. The route is explicitly dynamic and uses the Node.js runtime. Do not hard-code `NEXTAUTH_URL` to `http://localhost:3000` when opening the development app through a LAN IP or deploying to Vercel; an incorrect canonical URL can make the NextAuth client receive an HTML page instead of the expected JSON session response. Configure `NEXTAUTH_SECRET` in the deployment environment.

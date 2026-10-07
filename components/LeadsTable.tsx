@@ -64,12 +64,21 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
   const [discountCode, setDiscountCode] = useState("");
   const [savingCode, setSavingCode] = useState(false);
   const [codeMessage, setCodeMessage] = useState("");
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [leadDraft, setLeadDraft] = useState<Partial<Lead>>({});
+  const [savingLead, setSavingLead] = useState(false);
+  const [leadError, setLeadError] = useState("");
+  const [leadRows, setLeadRows] = useState(rows);
+  const [busyLead, setBusyLead] = useState<string | null>(null);
+  const [deletingLead, setDeletingLead] = useState<Lead | null>(null);
+
+  useEffect(() => { setLeadRows(rows); }, [rows]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((lead) => [lead.first_name, lead.last_name, lead.email, lead.city, lead.state, lead.zip_code, lead.discount_code].filter(Boolean).join(" ").toLowerCase().includes(q));
-  }, [rows, query]);
+    if (!q) return leadRows;
+    return leadRows.filter((lead) => [lead.first_name, lead.last_name, lead.email, lead.city, lead.state, lead.zip_code, lead.discount_code].filter(Boolean).join(" ").toLowerCase().includes(q));
+  }, [leadRows, query]);
 
   useEffect(() => {
     setDiscountCode(rows.find((lead) => lead.discount_code)?.discount_code || "");
@@ -88,6 +97,44 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
       .finally(() => !cancelled && setLoadingTemplate(false));
     return () => { cancelled = true; };
   }, [emailType]);
+
+  async function editLead(lead: Lead) {
+    const fields: (keyof Lead)[] = ["first_name","last_name","email","phone","discount_code","city","state","zip_code","date_arrival","date_received"];
+    const labels: Record<string,string> = {first_name:"First name",last_name:"Last name",email:"Email",phone:"Phone",discount_code:"Discount code",city:"City",state:"State",zip_code:"ZIP code",date_arrival:"Arrival date (YYYY-MM-DD)",date_received:"Date received (YYYY-MM-DD)"};
+    const updates: Record<string,string|null> = {};
+    for (const field of fields) {
+      const value = window.prompt(labels[field], String(lead[field] ?? ""));
+      if (value === null) return;
+      updates[field] = value.trim() || null;
+    }
+    setBusyLead(lead.id);
+    try {
+      const res = await fetch(`/api/leads/${encodeURIComponent(lead.id)}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(updates)});
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || "Could not update lead.");
+      setLeadRows(old => old.map(x => x.id === lead.id ? {...x,...updates} : x));
+    } catch(e) { alert(e instanceof Error ? e.message : "Could not update lead."); }
+    finally { setBusyLead(null); }
+  }
+  async function deleteLead(lead: Lead) {
+    if (!window.confirm(`Delete lead ${lead.first_name} ${lead.last_name} (${lead.email})? This cannot be undone.`)) return;
+    setBusyLead(lead.id);
+    try {
+      const res = await fetch(`/api/leads/${encodeURIComponent(lead.id)}`, {method:"DELETE"});
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || "Could not delete lead.");
+      setLeadRows(old => old.filter(x => x.id !== lead.id));
+    } catch(e) { alert(e instanceof Error ? e.message : "Could not delete lead."); }
+    finally { setBusyLead(null); }
+  }
+
+  function openLeadEditor(lead: Lead) { setEditingLead(lead); setLeadDraft({ ...lead }); setLeadError(""); }
+
+  async function saveLead() {
+    if (!editingLead) return; setSavingLead(true); setLeadError("");
+    try { const payload = { first_name: leadDraft.first_name || "", last_name: leadDraft.last_name || "", email: leadDraft.email || "", phone: leadDraft.phone || null, discount_code: leadDraft.discount_code || null, city: leadDraft.city || null, state: leadDraft.state || null, zip_code: leadDraft.zip_code || null, date_arrival: leadDraft.date_arrival || null, date_received: leadDraft.date_received || null };
+      const res = await fetch(`/api/leads/${encodeURIComponent(editingLead.id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || "Could not save lead.");
+      window.location.reload();
+    } catch (e) { setLeadError(e instanceof Error ? e.message : "Could not save lead."); } finally { setSavingLead(false); }
+  }
 
   function exportCsv() {
     const headers = ["id", "first_name", "last_name", "email", "phone", "discount_code", "city", "state", "zip_code", "date_arrival", "date_received", "welcome_sent", "remainder_sent"];
@@ -131,20 +178,22 @@ export function LeadsTable({ rows }: { rows: Lead[] }) {
       </div>
       <div className="table-shell">
         <table className="lead-table">
-          <colgroup><col className="col-name"/><col className="col-email"/><col className="col-location"/><col className="col-arrival"/><col className="col-discount"/><col className="col-status"/><col className="col-status"/></colgroup>
-          <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Arrival</th><th>Discount</th><th>Welcome</th><th>Reminder</th></tr></thead>
+          <colgroup><col className="col-name"/><col className="col-email"/><col className="col-location"/><col className="col-arrival"/><col className="col-discount"/><col className="col-status"/><col className="col-status"/><col className="col-actions"/></colgroup>
+          <thead><tr><th>Name</th><th>Email</th><th>Location</th><th>Arrival</th><th>Discount</th><th>Welcome</th><th>Reminder</th><th>Actions</th></tr></thead>
           <tbody>{filtered.map((lead) => <tr key={lead.id}>
             <td><div className="lead-name">{lead.first_name} {lead.last_name}</div></td>
             <td title={lead.email}><div className="cell-truncate">{lead.email}</div></td>
             <td title={[lead.city, lead.state, lead.zip_code].filter(Boolean).join(", ")}><div className="cell-truncate">{[lead.city, lead.state, lead.zip_code].filter(Boolean).join(", ") || "—"}</div></td>
             <td className="nowrap">{formatDate(lead.date_arrival)}</td>
             <td><span className="discount-pill">{lead.discount_code || "—"}</span></td>
-            <td><BoolBadge value={lead.welcome_sent}/></td><td><BoolBadge value={lead.remainder_sent}/></td>
-          </tr>)}{filtered.length === 0 && <tr><td colSpan={7} className="empty-cell">No matching leads.</td></tr>}</tbody>
+            <td><BoolBadge value={lead.welcome_sent}/></td><td><BoolBadge value={lead.remainder_sent}/></td><td className="lead-row-actions"><button className="secondary-button" disabled={busyLead===lead.id} onClick={() => openLeadEditor(lead)}>Edit</button><button className="secondary-button danger-outline" disabled={busyLead===lead.id} onClick={() => setDeletingLead(lead)}>Delete</button></td>
+          </tr>)}{filtered.length === 0 && <tr><td colSpan={8} className="empty-cell">No matching leads.</td></tr>}</tbody>
         </table>
       </div>
     </section>
+    {editingLead && <div className="edit-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setEditingLead(null); }}><section className="edit-modal" role="dialog" aria-modal="true" aria-labelledby="lead-edit-title"><div className="edit-modal-head"><div><p className="eyebrow">Chamber lead</p><h3 id="lead-edit-title">Edit lead</h3></div><button className="modal-close" onClick={() => setEditingLead(null)} aria-label="Close">×</button></div><div className="edit-modal-grid">{([["first_name","First name"],["last_name","Last name"],["email","Email"],["phone","Phone"],["discount_code","Discount code"],["city","City"],["state","State"],["zip_code","ZIP code"],["date_arrival","Arrival date"],["date_received","Date received"]] as const).map(([key,label]) => <label className="field-label" key={key}>{label}<input className="editor-input" type={key.startsWith("date_") ? "date" : "text"} value={String(leadDraft[key] ?? "")} onChange={e => setLeadDraft(d => ({...d,[key]:e.target.value}))}/></label>)}</div>{leadError && <p className="save-error">{leadError}</p>}<div className="edit-modal-actions"><button className="secondary-button" onClick={() => setEditingLead(null)}>Cancel</button><button className="primary-button" disabled={savingLead} onClick={() => void saveLead()}>{savingLead ? "Saving…" : "Save changes"}</button></div></section></div>}
 
+    {deletingLead && <div className="edit-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setDeletingLead(null); }}><section className="edit-modal delete-modal" role="dialog" aria-modal="true" aria-labelledby="lead-delete-title"><div className="edit-modal-head"><div><p className="eyebrow">Chamber lead</p><h3 id="lead-delete-title">Delete lead?</h3></div><button className="modal-close" onClick={() => setDeletingLead(null)} aria-label="Close">×</button></div><p>Delete <strong>{deletingLead.first_name} {deletingLead.last_name}</strong> ({deletingLead.email})? This cannot be undone.</p><div className="edit-modal-actions"><button className="secondary-button" onClick={() => setDeletingLead(null)}>Cancel</button><button className="primary-button delete-confirm-button" disabled={busyLead===deletingLead.id} onClick={async () => { const lead = deletingLead; setBusyLead(lead.id); try { const res = await fetch(`/api/leads/${encodeURIComponent(lead.id)}`, {method:"DELETE"}); const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || "Could not delete lead."); setLeadRows(old => old.filter(x => x.id !== lead.id)); setDeletingLead(null); } catch(e) { setLeadError(e instanceof Error ? e.message : "Could not delete lead."); } finally { setBusyLead(null); } }}>{busyLead===deletingLead.id ? "Deleting…" : "Delete permanently"}</button></div></section></div>}
     <div className="lead-editors-grid">
       <section className="side-card card">
         <div className="card-title-row"><span className="icon-tile blue"><Icon name="mail"/></span><h3 className="font-display text-2xl" style={{ color: "var(--navy)" }}>Email Templates</h3></div>
