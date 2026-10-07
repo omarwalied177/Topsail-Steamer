@@ -239,7 +239,6 @@ export type ReviewReply = {
   location_id: string | null;
   created_at?: string | null;
   source?: string | null;
-  reviewer_email?: string | null;
   email_message_id?: string | null;
   email_sent_at?: string | null;
   email_thread_id?: string | null;
@@ -299,6 +298,7 @@ export async function createReviewReply(input: {
   review_posted_at: string;
   draft_reply: string | null;
   status: string;
+  reviewer_email?: string | null;
   location_id?: string | null;
 }): Promise<ReviewReply> {
   const rows = await supabaseFetch<ReviewReply[]>("review_replies", {

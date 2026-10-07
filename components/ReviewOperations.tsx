@@ -179,7 +179,6 @@ export function ReviewOperations({ initialReviews, initialContext }: { initialRe
     let sendDraft = draft.trim();
     if (getFeedbackTone(review) === "positive" && !draftHasGoogleLink(sendDraft)) {
       sendDraft = ensureGoogleReviewLink(sendDraft);
-      setDraft(sendDraft);
     }
 
     setBusyId(review.id); setNotice(null);
@@ -309,7 +308,7 @@ export function ReviewOperations({ initialReviews, initialContext }: { initialRe
   </div>;
 }
 
-function ReviewCard({ review, busy, onUpdate, onSendEmail, onDelete }: { review: Review; busy: boolean; onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>; onSendEmail: (review: Review, draft: string) => Promise<void>; onDelete: (review: Review) => Promise<void> }) {
+function ReviewCard({ review, busy, onUpdate, onSendEmail, onDelete }: { review: Review; busy: boolean; onUpdate: (id: string, payload: Record<string, unknown>) => Promise<void>; onSendEmail: (review: Review, draft: string) => Promise<void>; onDelete: (review: Review) => void }) {
   const [draft, setDraft] = useState(review.draft_reply || "");
   const [copied, setCopied] = useState(false);
   const tone = getFeedbackTone(review);
