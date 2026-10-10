@@ -114,6 +114,35 @@ export function InventoryForecast({ items, monthly, summaries, forecasts, orderP
     }
   }
 
+  async function saveInventoryField(item: ItemMaster, field: "starting_qty" | "purchased_qty", value: string) {
+    const qty = Number(value);
+    if (value.trim() === "" || !Number.isFinite(qty) || qty < 0) {
+      setRunError("Enter a valid non-negative quantity.");
+      return;
+    }
+    setRunError("");
+    try {
+      const response = await fetch("/api/automation3/inventory-field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year: Number(month.slice(0, 4)),
+          month: Number(month.slice(5, 7)),
+          item_name: item.item,
+          category: item.category,
+          field,
+          quantity: qty,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not save inventory quantity.");
+      setRunMessage(`${field === "starting_qty" ? "Starting inventory" : "Purchased quantity"} saved for ${item.item}.`);
+      window.location.reload();
+    } catch (e) {
+      setRunError(e instanceof Error ? e.message : "Could not save inventory quantity.");
+    }
+  }
+
   return <>
     <div className="inventory-kpis">
       <div className="stat-card"><span>Food Cost %</span><strong>{overallPct == null ? "—" : `${(overallPct * 100).toFixed(1)}%`}</strong><small>{goalPct == null ? "Goal not configured" : `${(Number(goalPct) * 100).toFixed(0)}% goal`}</small></div>
@@ -141,11 +170,11 @@ export function InventoryForecast({ items, monthly, summaries, forecasts, orderP
       <strong>{runError ? "Automation error:" : "Automation:"}</strong> {runError || runMessage}
     </div>}
 
-    {section === "close" ? <div className="inventory-close-grid">
+    {section === "close" ? <div className="inventory-close-layout">
       <section className="card inventory-panel"><div className="panel-head"><div><h3 className="font-display">Starting → Purchased → Ending</h3></div><span className="close-badge">{reviewCount ? `${reviewCount} to finish` : "Close ready"}</span></div>
-        <div className="table-shell"><table className="invoice-table inventory-table"><thead><tr><th>Item</th><th>Category</th><th>Start</th><th>Purchased</th><th>Unit Cost</th><th>Ending Qty</th><th>Ending Cost</th><th>Review</th></tr></thead><tbody>{sortedItems.map(item => { const r = monthRows.find(x => x.item_name === item.item); return <tr key={item.id}><td><strong>{item.item}</strong><small>{item.count_by_unit}</small></td><td>{item.category}</td><td>{num(r?.starting_qty)}</td><td>{num(r?.purchased_qty)}</td><td>{money(r?.unit_cost)}</td><td>{r?.ending_qty == null ? <input className="count-input" inputMode="decimal" placeholder="Physical count" onBlur={e => saveEnding(item, e.target.value)} /> : <span className="ending-count">{num(r.ending_qty)}</span>}</td><td>{money(r?.ending_cost ?? (r?.ending_qty != null && r.unit_cost != null ? r.ending_qty * r.unit_cost : null))}</td><td>{r?.needs_review ? <span className="invoice-status needs_review">Review</span> : r ? <span className="invoice-status matched">OK</span> : <span className="invoice-status no_match">Pending</span>}</td></tr>; })}</tbody></table></div>
+        <div className="table-shell"><table className="invoice-table inventory-table"><thead><tr><th>Item</th><th>Category</th><th>Start</th><th>Purchased</th><th>Unit Cost</th><th>Ending Qty</th><th>Ending Cost</th><th>Review</th></tr></thead><tbody>{sortedItems.map(item => { const r = monthRows.find(x => x.item_name === item.item); return <tr key={item.id}><td><strong>{item.item}</strong><small>{item.count_by_unit}</small></td><td>{item.category}</td><td><input aria-label={`Starting quantity for ${item.item}`} className="count-input editable-inventory-input" inputMode="decimal" type="number" min="0" step="any" defaultValue={r?.starting_qty ?? ""} placeholder="Start qty" onBlur={e => { if (e.target.value !== String(r?.starting_qty ?? "")) void saveInventoryField(item, "starting_qty", e.target.value); }} /></td><td><span className="ending-count">{r?.purchased_qty == null ? "—" : num(r.purchased_qty)}</span></td><td>{money(r?.unit_cost)}</td><td>{r?.ending_qty == null ? <input className="count-input" inputMode="decimal" placeholder="Physical count" onBlur={e => saveEnding(item, e.target.value)} /> : <span className="ending-count">{num(r.ending_qty)}</span>}</td><td>{money(r?.ending_cost ?? (r?.ending_qty != null && r.unit_cost != null ? r.ending_qty * r.unit_cost : null))}</td><td>{r?.needs_review ? <span className="invoice-status needs_review">Review</span> : r ? <span className="invoice-status matched">OK</span> : <span className="invoice-status no_match">Pending</span>}</td></tr>; })}</tbody></table></div>
       </section>
-      <aside className="card close-summary"><div className="panel-head"><div><span className="section-kicker">Food Cost summary</span><h3 className="font-display">Food Cost Summary</h3></div></div>{summaryRows.length ? summaryRows.map(r => <div className={`cost-summary-row ${r.status}`} key={r.id}><div><strong>{r.category}</strong><span>{r.category === "5010 Pot Cost" ? "Excluded until owner confirms costs" : "Included in Food Cost %"}</span></div><strong>{r.food_cost_pct == null ? "—" : `${(r.food_cost_pct * 100).toFixed(1)}%`}</strong></div>) : <div className="empty-review compact"><h4>No close summary yet</h4><p>Category totals will appear after the monthly close and ending counts are complete.</p></div>}<div className="close-formula"><span>Formula</span><strong>Starting + Purchased − Ending = Food Cost</strong></div></aside>
+      <aside className="card close-summary food-cost-summary-below"><div className="panel-head"><div><span className="section-kicker">Food Cost summary</span><h3 className="font-display">Food Cost Summary</h3></div></div>{summaryRows.length ? summaryRows.map(r => <div className={`cost-summary-row ${r.status}`} key={r.id}><div><strong>{r.category}</strong><span>{r.category === "5010 Pot Cost" ? "Excluded until owner confirms costs" : "Included in Food Cost %"}</span></div><strong>{r.food_cost_pct == null ? "—" : `${(r.food_cost_pct * 100).toFixed(1)}%`}</strong></div>) : <div className="empty-review compact"><h4>No close summary yet</h4><p>Category totals will appear after the monthly close and ending counts are complete.</p></div>}<div className="close-formula"><span>Formula</span><strong>Starting + Purchased − Ending = Food Cost</strong></div></aside>
     </div> : section === "forecast" ? <div className="forecast-grid">
       <section className="card inventory-panel"><div className="panel-head"><div><h3 className="font-display">Next delivery demand</h3></div></div><div className="table-shell"><table className="invoice-table inventory-table"><thead><tr><th>Ingredient</th><th>Unit</th><th>Prior-year qty</th><th>YoY growth</th><th>Forecast qty</th><th>Forecast cost</th></tr></thead><tbody>{weekForecast.map(r => <tr key={r.id}><td><strong>{r.ingredient}</strong></td><td>{r.unit || "—"}</td><td>{num(r.prior_year_qty)}</td><td className={Number(r.growth_rate_pct || 0) > 0 ? "trend-up" : "trend-down"}>{r.growth_rate_pct == null ? "—" : `${Number(r.growth_rate_pct).toFixed(1)}%`}</td><td>{num(r.forecast_qty)}</td><td>{money(r.forecast_cost)}</td></tr>)}</tbody></table></div></section>
       <aside className="card close-summary"><div className="panel-head"><div><span className="section-kicker">Vendor order guardrails</span><h3 className="font-display">Order Guide</h3></div></div>{weekOrders.length ? weekOrders.map(r => <div className={`order-row ${r.meets_minimum === false ? "short" : "met"}`} key={r.id}><div><strong>{r.vendor}</strong><span>{r.ingredient} · {num(r.projected_qty)} {r.unit || "units"}</span></div><div><strong>{money(r.projected_spend)}</strong><small>{r.vendor_minimum == null ? "Minimum not set" : `${money(r.vendor_minimum)} minimum`}</small></div></div>) : <div className="empty-review compact"><h4>No order plan yet</h4><p>Run the weekly n8n workflow to populate ingredient demand and vendor minimum checks.</p></div>}<div className="vendor-minimum-note"><strong>Known minimums</strong><span>Bar Harbor Seafood $350 · Sysco $650 · US Foods 10 cases</span></div></aside>
